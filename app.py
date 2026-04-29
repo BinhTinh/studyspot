@@ -4,7 +4,8 @@ Stack: DeepSeek API + Flask (không cần vector DB)
 Deploy: Render.com (miễn phí, HTTPS, embed vào Google Sites)
 """
 
-import json, os
+import json
+import os
 from flask import Flask, request, jsonify, render_template_string
 from openai import OpenAI
 
@@ -15,6 +16,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 with open(os.path.join(BASE_DIR, "cafes_data.json"), "r", encoding="utf-8") as f:
     cafes = json.load(f)
+
 
 def build_cafe_context(cafes):
     lines = []
@@ -36,17 +38,18 @@ def build_cafe_context(cafes):
         )
     return "\n".join(lines)
 
+
 CAFE_CONTEXT = build_cafe_context(cafes)
 
 SYSTEM_PROMPT = f"""Bạn là trợ lý tư vấn quán cà phê học tập thân thiện của website StudySpot Finder tại TP.HCM.
 Nhiệm vụ của bạn là giúp người dùng tìm quán phù hợp để học bài, làm việc, cày deadline.
 
 NGUYÊN TẮC TRẢ LỜI:
-- Luôn trả lời bằng tiếng Việt, thân thiện, ngắn gọn (tối đa 4-5 dòng mỗi quán)
-- Gợi ý tối đa 2-3 quán phù hợp nhất với yêu cầu
-- Luôn kèm link Google Maps nếu có
-- Nếu không tìm thấy quán phù hợp, hãy thành thật nói và hỏi thêm tiêu chí
-- Trình bày dạng bullet point, dễ đọc trên điện thoại
+- Luôn trả lời bằng tiếng Việt, thân thiện, ngắn gọn (tối đa 4–5 dòng mỗi quán).
+- Gợi ý tối đa 2–3 quán phù hợp nhất với yêu cầu.
+- Luôn kèm link Google Maps nếu có.
+- Nếu không tìm thấy quán phù hợp, hãy thành thật nói và hỏi thêm tiêu chí.
+- Trình bày dạng bullet point, dễ đọc trên điện thoại.
 
 DỮ LIỆU 36 QUÁN:
 {CAFE_CONTEXT}
@@ -57,8 +60,9 @@ DỮ LIỆU 36 QUÁN:
 # ─────────────────────────────────────────
 client = OpenAI(
     api_key=os.environ.get("DEEPSEEK_API_KEY", ""),
-    base_url="https://api.deepseek.com"
+    base_url="https://api.deepseek.com",
 )
+
 
 def ask_deepseek(user_message: str, history: list) -> str:
     messages = [{"role": "system", "content": SYSTEM_PROMPT}]
@@ -70,9 +74,10 @@ def ask_deepseek(user_message: str, history: list) -> str:
         model="deepseek-chat",
         messages=messages,
         temperature=0.4,
-        max_tokens=600
+        max_tokens=600,
     )
     return response.choices[0].message.content
+
 
 # ─────────────────────────────────────────
 # 3. FLASK APP + GIAO DIỆN CHATBOT
@@ -152,7 +157,7 @@ CHAT_UI = """<!DOCTYPE html>
     <h2>☕ StudySpot Finder</h2>
     <p>Tư vấn quán cà phê học tập tại TP.HCM</p>
   </div>
-  <div id="messages" id="msgs">
+  <div id="messages">
     <div class="msg bot">
       Xin chào! Mình có thể giúp bạn tìm quán cà phê học tập phù hợp nhất 😊<br><br>
       Bạn cần quán <b>yên tĩnh</b>, <b>mở 24h</b>, <b>giá rẻ</b>, hay <b>gần khu vực nào</b>?
@@ -165,9 +170,8 @@ CHAT_UI = """<!DOCTYPE html>
     <button class="chip" onclick="quickAsk('Quán nào phù hợp học nhóm?')">👥 Học nhóm</button>
   </div>
   <div id="input-row">
-    <input id="user-input" type="text" placeholder="Hỏi về quán cà phê..." 
-           onkeydown="if(event.key==='Enter') sendMsg()"/>
-    <button id="send-btn" onclick="sendMsg()">&#9658;</button>
+    <input id="user-input" type="text" placeholder="Hỏi về quán cà phê..." />
+    <button id="send-btn">▶</button>
   </div>
 </div>
 
@@ -178,7 +182,7 @@ function addMsg(text, role) {
   const msgs = document.getElementById('messages');
   const div = document.createElement('div');
   div.className = 'msg ' + role;
-  div.innerHTML = text.replace(/\n/g, '<br>');
+  div.innerHTML = text.replace(/\\n/g, '<br>');
   msgs.appendChild(div);
   msgs.scrollTop = msgs.scrollHeight;
   return div;
@@ -210,23 +214,41 @@ async function sendMsg() {
     history.push({role: 'user', content: text});
     history.push({role: 'assistant', content: data.reply});
     if (history.length > 12) history = history.slice(-12);
-  } catch(e) {
+  } catch (e) {
     typing.textContent = 'Lỗi kết nối, vui lòng thử lại.';
   }
 }
+
+document.addEventListener('DOMContentLoaded', () => {
+  const input = document.getElementById('user-input');
+  const btn   = document.getElementById('send-btn');
+
+  input.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();  // Chặn submit form cha (Google Sites iframe)
+      sendMsg();
+    }
+  });
+
+  btn.addEventListener('click', () => {
+    sendMsg();
+  });
+});
 </script>
 </body>
-</html>"""
+</html>
+"""
 
 @app.route("/")
 def index():
     return render_template_string(CHAT_UI)
 
+
 @app.route("/chat", methods=["POST"])
 def chat():
-    data = request.get_json()
+    data = request.get_json() or {}
     user_msg = data.get("message", "").strip()
-    history  = data.get("history", [])
+    history = data.get("history", [])
     if not user_msg:
         return jsonify({"reply": "Bạn chưa nhập câu hỏi."})
     try:
@@ -234,6 +256,7 @@ def chat():
     except Exception as e:
         reply = f"Xin lỗi, có lỗi xảy ra: {str(e)}"
     return jsonify({"reply": reply})
+
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
