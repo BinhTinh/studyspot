@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>StudySpot Chatbot</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html, body { width:100%; height:100%; background:transparent; font-family:'Segoe UI',sans-serif; overflow:hidden; }
+
+  #wrapper { position:relative; width:100%; height:100%; }
+
+  /* BUBBLE */
+  #chat-bubble {
+    position:absolute; bottom:16px; right:16px;
+    width:56px; height:56px;
+    background:linear-gradient(135deg,#6366f1,#8b5cf6);
+    border-radius:50%; display:flex; align-items:center; justify-content:center;
+    font-size:24px; cursor:pointer;
+    box-shadow:0 4px 16px rgba(99,102,241,0.5);
+    z-index:10; user-select:none; transition:transform 0.2s;
+  }
+  #chat-bubble:hover { transform:scale(1.08); }
+  #chat-bubble::after {
+    content:''; position:absolute; top:4px; right:4px;
+    width:11px; height:11px; background:#22c55e;
+    border-radius:50%; border:2px solid white;
+  }
+
+  /* CHAT WINDOW */
+  #chat-window {
+    position:absolute;
+    top:0; left:0; right:0; bottom:80px;
+    background:white; border-radius:16px;
+    box-shadow:0 8px 32px rgba(0,0,0,0.15);
+    display:none; flex-direction:column;
+    overflow:hidden; z-index:9; margin:8px 8px 0 8px;
+  }
+  #chat-window.open { display:flex; }
+
+  /* Header */
+  #chat-header {
+    background:linear-gradient(135deg,#6366f1,#8b5cf6);
+    color:white; padding:12px 14px;
+    display:flex; align-items:center; gap:10px; flex-shrink:0;
+  }
+  .av {
+    width:34px; height:34px; background:rgba(255,255,255,0.25);
+    border-radius:50%; display:flex; align-items:center;
+    justify-content:center; font-size:16px; flex-shrink:0;
+  }
+  .inf h3 { font-size:13px; font-weight:700; }
+  .inf p  { font-size:11px; opacity:0.85; margin-top:1px; }
+  .online {
+    margin-left:auto; font-size:11px; opacity:0.9;
+    display:flex; align-items:center; gap:4px;
+  }
+  .online::before {
+    content:''; width:7px; height:7px;
+    background:#4ade80; border-radius:50%; display:inline-block;
+  }
+  #close-btn {
+    background:rgba(255,255,255,0.2); border:none; color:white;
+    width:26px; height:26px; border-radius:50%; cursor:pointer;
+    font-size:14px; margin-left:8px;
+    display:flex; align-items:center; justify-content:center;
+    transition:background 0.2s; flex-shrink:0;
+  }
+  #close-btn:hover { background:rgba(255,255,255,0.35); }
+
+  /* Messages */
+  #messages {
+    flex:1; overflow-y:auto; padding:12px;
+    display:flex; flex-direction:column; gap:8px; background:#f8fafc;
+  }
+  #messages::-webkit-scrollbar { width:3px; }
+  #messages::-webkit-scrollbar-thumb { background:#cbd5e1; border-radius:3px; }
+
+  .msg {
+    max-width:84%; padding:8px 12px; border-radius:14px;
+    font-size:13px; line-height:1.5; word-break:break-word;
+  }
+  .user { background:#6366f1; color:white; align-self:flex-end; border-bottom-right-radius:3px; }
+  .bot  { background:white; color:#1e293b; align-self:flex-start; border-bottom-left-radius:3px; box-shadow:0 1px 3px rgba(0,0,0,0.08); }
+  .typing { color:#94a3b8; font-style:italic; font-size:12px; background:white !important; }
+
+  /* Chips */
+  #suggestions { display:flex; flex-wrap:wrap; gap:5px; padding:6px 12px 2px; background:#f8fafc; flex-shrink:0; }
+  .chip {
+    background:#ede9fe; color:#5b21b6; border:none;
+    padding:4px 9px; border-radius:20px; font-size:11px;
+    cursor:pointer; transition:background 0.2s;
+  }
+  .chip:hover { background:#ddd6fe; }
+
+  /* Input */
+  #input-row { display:flex; padding:8px 10px; gap:7px; border-top:1px solid #e2e8f0; background:white; flex-shrink:0; }
+  #user-input {
+    flex:1; padding:8px 12px; border:1.5px solid #e2e8f0;
+    border-radius:20px; font-size:13px; outline:none; background:#f8fafc;
+  }
+  #user-input:focus { border-color:#6366f1; background:white; }
+  #send-btn {
+    background:#6366f1; color:white; border:none; border-radius:50%;
+    width:34px; height:34px; cursor:pointer; font-size:15px; flex-shrink:0;
+    display:flex; align-items:center; justify-content:center; transition:background 0.2s;
+  }
+  #send-btn:hover { background:#4f46e5; }
+  a { color:#6366f1; }
+</style>
+</head>
+<body>
+<div id="wrapper">
+
+  <div id="chat-window">
+    <div id="chat-header">
+      <div class="av">🤖</div>
+      <div class="inf">
+        <h3>StudySpot Finder</h3>
+        <p>Tư vấn quán cà phê học tập</p>
+      </div>
+      <div class="online">Online</div>
+      <button id="close-btn" onclick="toggleChat()">✕</button>
+    </div>
+
+    <div id="messages">
+      <div class="msg bot">
+        Xin chào! Mình giúp bạn tìm quán cà phê học tập ở TP.HCM 😊<br><br>
+        Bạn cần quán <b>yên tĩnh</b>, <b>mở 24h</b>, <b>giá rẻ</b>, hay <b>gần khu vực nào</b>?
+      </div>
+    </div>
+
+    <div id="suggestions">
+      <button class="chip" onclick="quickAsk('Quán nào yên tĩnh nhất?')">🤫 Yên tĩnh</button>
+      <button class="chip" onclick="quickAsk('Quán nào mở 24h?')">🌙 Mở 24h</button>
+      <button class="chip" onclick="quickAsk('Quán giá rẻ nhất?')">💰 Giá rẻ</button>
+      <button class="chip" onclick="quickAsk('Quán nào phù hợp học nhóm?')">👥 Học nhóm</button>
+    </div>
+
+    <div id="input-row">
+      <input id="user-input" type="text" placeholder="Nhập câu hỏi..." />
+      <button id="send-btn">&#9658;</button>
+    </div>
+  </div>
+
+  <div id="chat-bubble" onclick="toggleChat()" title="Hỏi về quán cà phê học tập">☕</div>
+
+</div>
+<script>
+// ⚠️ Thay bằng URL Render của bạn
+const API_URL = "https://studyspot-u8qa.onrender.com/chat";
+
+let chatHistory = [];
+let isOpen = false;
+
+function toggleChat() {
+  isOpen = !isOpen;
+  const win    = document.getElementById("chat-window");
+  const bubble = document.getElementById("chat-bubble");
+  if (isOpen) {
+    win.classList.add("open");
+    bubble.style.transform = "rotate(15deg) scale(1.05)";
+    setTimeout(() => document.getElementById("user-input").focus(), 50);
+  } else {
+    win.classList.remove("open");
+    bubble.style.transform = "";
+  }
+}
+
+function addMsg(text, role) {
+  const msgs = document.getElementById("messages");
+  const div  = document.createElement("div");
+  div.className = "msg " + role;
+  div.innerHTML = text.replace(/\n/g, "<br>");
+  msgs.appendChild(div);
+  msgs.scrollTop = msgs.scrollHeight;
+  return div;
+}
+
+function quickAsk(text) {
+  document.getElementById("user-input").value = text;
+  sendMsg();
+}
+
+async function sendMsg() {
+  const input = document.getElementById("user-input");
+  const text  = input.value.trim();
+  if (!text) return;
+  input.value = "";
+  document.getElementById("suggestions").style.display = "none";
+  addMsg(text, "user");
+  const typing = addMsg("Đang tìm kiếm...", "bot typing");
+  try {
+    const res  = await fetch(API_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: text, history: chatHistory })
+    });
+    const data = await res.json();
+    typing.remove();
+    addMsg(data.reply, "bot");
+    chatHistory.push({ role: "user",      content: text });
+    chatHistory.push({ role: "assistant", content: data.reply });
+    if (chatHistory.length > 12) chatHistory = chatHistory.slice(-12);
+  } catch (e) {
+    typing.textContent = "Lỗi kết nối, vui lòng thử lại.";
+  }
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  document.getElementById("user-input").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); sendMsg(); }
+  });
+  document.getElementById("send-btn").addEventListener("click", sendMsg);
+});
+</script>
+</body>
+</html>
