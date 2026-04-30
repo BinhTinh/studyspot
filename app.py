@@ -241,7 +241,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 @app.route("/")
 def index():
-    return render_template_string(CHAT_UI)
+    return CHAT_UI
 
 
 @app.route("/chat", methods=["POST"])
