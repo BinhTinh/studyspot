@@ -1,7 +1,7 @@
 """
 StudySpot Finder Chatbot
 Stack: DeepSeek API + Flask
-UI: Floating bubble widget (popup khi click)
+UI: Floating bubble widget - fixed for iframe embedding
 Deploy: Render.com → embed iframe vào Google Sites
 """
 
@@ -81,146 +81,153 @@ CHAT_UI = """<!DOCTYPE html>
 <title>StudySpot Chatbot</title>
 <style>
   * { margin:0; padding:0; box-sizing:border-box; }
-  body { background: transparent; font-family: 'Segoe UI', sans-serif; }
 
+  html, body {
+    width: 100%; height: 100%;
+    background: transparent;
+    font-family: 'Segoe UI', sans-serif;
+    overflow: hidden;
+  }
+
+  /* Wrapper chiếm toàn bộ iframe */
+  #wrapper {
+    position: relative;
+    width: 100%; height: 100%;
+  }
+
+  /* ── BUBBLE ── */
   #chat-bubble {
-    position: fixed;
-    bottom: 20px; right: 20px;
-    width: 58px; height: 58px;
+    position: absolute;
+    bottom: 16px; right: 16px;
+    width: 56px; height: 56px;
     background: linear-gradient(135deg, #6366f1, #8b5cf6);
     border-radius: 50%;
     display: flex; align-items: center; justify-content: center;
-    font-size: 26px;
+    font-size: 24px;
     cursor: pointer;
-    box-shadow: 0 4px 18px rgba(99,102,241,0.45);
-    transition: transform 0.2s, box-shadow 0.2s;
-    z-index: 9999;
+    box-shadow: 0 4px 16px rgba(99,102,241,0.5);
+    z-index: 10;
     user-select: none;
+    transition: transform 0.2s;
   }
-  #chat-bubble:hover {
-    transform: scale(1.1);
-    box-shadow: 0 6px 24px rgba(99,102,241,0.55);
-  }
-  #chat-bubble.open { transform: rotate(15deg) scale(1.05); }
+  #chat-bubble:hover { transform: scale(1.08); }
   #chat-bubble::after {
     content: '';
-    position: absolute;
-    top: 4px; right: 4px;
-    width: 12px; height: 12px;
-    background: #22c55e;
-    border-radius: 50%;
+    position: absolute; top: 4px; right: 4px;
+    width: 11px; height: 11px;
+    background: #22c55e; border-radius: 50%;
     border: 2px solid white;
   }
 
+  /* ── CHAT WINDOW ── */
   #chat-window {
-    position: fixed;
-    bottom: 90px; right: 20px;
-    width: 360px; height: 520px;
+    position: absolute;
+    /* Chiếm toàn bộ iframe trừ phần bubble ở dưới */
+    bottom: 80px; right: 0; left: 0;
+    top: 0;
     background: white;
-    border-radius: 20px;
-    box-shadow: 0 12px 48px rgba(0,0,0,0.18);
-    display: flex; flex-direction: column;
+    border-radius: 16px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.15);
+    display: none;          /* ẩn mặc định */
+    flex-direction: column;
     overflow: hidden;
-    z-index: 9998;
-    opacity: 0;
-    transform: translateY(20px) scale(0.95);
-    pointer-events: none;
-    transition: opacity 0.25s ease, transform 0.25s ease;
+    z-index: 9;
+    margin: 8px 8px 0 8px;
   }
-  #chat-window.visible {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-    pointer-events: all;
-  }
+  #chat-window.visible { display: flex; }
 
+  /* Header */
   #chat-header {
     background: linear-gradient(135deg, #6366f1, #8b5cf6);
-    color: white; padding: 14px 16px;
+    color: white; padding: 12px 14px;
     display: flex; align-items: center; gap: 10px;
+    flex-shrink: 0;
   }
-  #chat-header .avatar {
-    width: 36px; height: 36px;
+  .avatar {
+    width: 34px; height: 34px;
     background: rgba(255,255,255,0.25);
     border-radius: 50%;
     display: flex; align-items: center; justify-content: center;
-    font-size: 18px;
+    font-size: 16px; flex-shrink: 0;
   }
-  #chat-header .info h3 { font-size: 14px; font-weight: 700; }
-  #chat-header .info p  { font-size: 11px; opacity: 0.85; margin-top: 1px; }
-  #chat-header .status {
+  .info h3 { font-size: 13px; font-weight: 700; }
+  .info p  { font-size: 11px; opacity: 0.85; margin-top: 1px; }
+  .status  {
     margin-left: auto;
-    display: flex; align-items: center; gap: 5px;
     font-size: 11px; opacity: 0.9;
+    display: flex; align-items: center; gap: 4px;
   }
-  #chat-header .status::before {
+  .status::before {
     content: '';
     width: 7px; height: 7px;
-    background: #4ade80;
-    border-radius: 50%;
+    background: #4ade80; border-radius: 50%;
     display: inline-block;
   }
   #close-btn {
-    background: rgba(255,255,255,0.2);
-    border: none; color: white;
-    width: 28px; height: 28px;
+    background: rgba(255,255,255,0.2); border: none;
+    color: white; width: 26px; height: 26px;
     border-radius: 50%; cursor: pointer;
-    font-size: 15px; margin-left: 8px;
+    font-size: 14px; margin-left: 8px;
     display: flex; align-items: center; justify-content: center;
-    transition: background 0.2s;
+    transition: background 0.2s; flex-shrink: 0;
   }
   #close-btn:hover { background: rgba(255,255,255,0.35); }
 
+  /* Messages */
   #messages {
-    flex:1; overflow-y: auto; padding: 14px;
-    display: flex; flex-direction: column; gap: 10px;
+    flex: 1; overflow-y: auto; padding: 12px;
+    display: flex; flex-direction: column; gap: 8px;
     background: #f8fafc;
   }
-  #messages::-webkit-scrollbar { width: 4px; }
-  #messages::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+  #messages::-webkit-scrollbar { width: 3px; }
+  #messages::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
 
   .msg {
-    max-width: 82%; padding: 9px 13px;
-    border-radius: 16px; font-size: 13px; line-height: 1.55;
+    max-width: 84%; padding: 8px 12px;
+    border-radius: 14px; font-size: 13px; line-height: 1.5;
     word-break: break-word;
   }
   .user {
     background: #6366f1; color: white;
-    align-self: flex-end; border-bottom-right-radius: 4px;
+    align-self: flex-end; border-bottom-right-radius: 3px;
   }
   .bot {
     background: white; color: #1e293b;
-    align-self: flex-start; border-bottom-left-radius: 4px;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    align-self: flex-start; border-bottom-left-radius: 3px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
   }
   .typing { color: #94a3b8; font-style: italic; font-size: 12px; background: white !important; }
 
+  /* Chips */
   #suggestions {
-    display: flex; flex-wrap: wrap; gap: 6px;
-    padding: 8px 14px 2px;
-    background: #f8fafc;
+    display: flex; flex-wrap: wrap; gap: 5px;
+    padding: 6px 12px 2px; background: #f8fafc;
+    flex-shrink: 0;
   }
   .chip {
     background: #ede9fe; color: #5b21b6; border: none;
-    padding: 5px 10px; border-radius: 20px;
-    font-size: 11.5px; cursor: pointer;
-    transition: background 0.2s; white-space: nowrap;
+    padding: 4px 9px; border-radius: 20px;
+    font-size: 11px; cursor: pointer;
+    transition: background 0.2s;
   }
   .chip:hover { background: #ddd6fe; }
 
+  /* Input */
   #input-row {
-    display: flex; padding: 10px 12px; gap: 8px;
+    display: flex; padding: 8px 10px; gap: 7px;
     border-top: 1px solid #e2e8f0; background: white;
+    flex-shrink: 0;
   }
   #user-input {
-    flex:1; padding: 9px 14px;
-    border: 1.5px solid #e2e8f0; border-radius: 24px;
+    flex: 1; padding: 8px 12px;
+    border: 1.5px solid #e2e8f0; border-radius: 20px;
     font-size: 13px; outline: none; background: #f8fafc;
   }
   #user-input:focus { border-color: #6366f1; background: white; }
   #send-btn {
     background: #6366f1; color: white; border: none;
-    border-radius: 50%; width: 36px; height: 36px;
-    cursor: pointer; font-size: 16px; flex-shrink: 0;
+    border-radius: 50%; width: 34px; height: 34px;
+    cursor: pointer; font-size: 15px; flex-shrink: 0;
     display: flex; align-items: center; justify-content: center;
     transition: background 0.2s;
   }
@@ -229,38 +236,43 @@ CHAT_UI = """<!DOCTYPE html>
 </style>
 </head>
 <body>
+<div id="wrapper">
 
-<div id="chat-bubble" onclick="toggleChat()" title="Hỏi về quán cà phê học tập">☕</div>
-
-<div id="chat-window">
-  <div id="chat-header">
-    <div class="avatar">🤖</div>
-    <div class="info">
-      <h3>StudySpot Finder</h3>
-      <p>Tư vấn quán cà phê học tập</p>
+  <!-- Chat window -->
+  <div id="chat-window">
+    <div id="chat-header">
+      <div class="avatar">🤖</div>
+      <div class="info">
+        <h3>StudySpot Finder</h3>
+        <p>Tư vấn quán cà phê học tập</p>
+      </div>
+      <div class="status">Online</div>
+      <button id="close-btn" onclick="toggleChat()">✕</button>
     </div>
-    <div class="status">Online</div>
-    <button id="close-btn" onclick="toggleChat()">✕</button>
-  </div>
 
-  <div id="messages">
-    <div class="msg bot">
-      Xin chào! Mình giúp bạn tìm quán cà phê học tập ở TP.HCM 😊<br><br>
-      Bạn cần quán <b>yên tĩnh</b>, <b>mở 24h</b>, <b>giá rẻ</b>, hay <b>gần khu vực nào</b>?
+    <div id="messages">
+      <div class="msg bot">
+        Xin chào! Mình giúp bạn tìm quán cà phê học tập ở TP.HCM 😊<br><br>
+        Bạn cần quán <b>yên tĩnh</b>, <b>mở 24h</b>, <b>giá rẻ</b>, hay <b>gần khu vực nào</b>?
+      </div>
+    </div>
+
+    <div id="suggestions">
+      <button class="chip" onclick="quickAsk('Quán nào yên tĩnh nhất?')">🤫 Yên tĩnh</button>
+      <button class="chip" onclick="quickAsk('Quán nào mở 24h?')">🌙 Mở 24h</button>
+      <button class="chip" onclick="quickAsk('Quán giá rẻ nhất?')">💰 Giá rẻ</button>
+      <button class="chip" onclick="quickAsk('Quán nào phù hợp học nhóm?')">👥 Học nhóm</button>
+    </div>
+
+    <div id="input-row">
+      <input id="user-input" type="text" placeholder="Nhập câu hỏi..." />
+      <button id="send-btn">&#9658;</button>
     </div>
   </div>
 
-  <div id="suggestions">
-    <button class="chip" onclick="quickAsk('Quán nào yên tĩnh nhất?')">🤫 Yên tĩnh</button>
-    <button class="chip" onclick="quickAsk('Quán nào mở 24h?')">🌙 Mở 24h</button>
-    <button class="chip" onclick="quickAsk('Quán giá sinh viên rẻ nhất?')">💰 Giá rẻ</button>
-    <button class="chip" onclick="quickAsk('Quán nào phù hợp học nhóm?')">👥 Học nhóm</button>
-  </div>
+  <!-- Bubble -->
+  <div id="chat-bubble" onclick="toggleChat()" title="Hỏi về quán cà phê học tập">☕</div>
 
-  <div id="input-row">
-    <input id="user-input" type="text" placeholder="Nhập câu hỏi..." />
-    <button id="send-btn">&#9658;</button>
-  </div>
 </div>
 
 <script>
@@ -273,11 +285,11 @@ function toggleChat() {
   const bubble = document.getElementById('chat-bubble');
   if (isOpen) {
     win.classList.add('visible');
-    bubble.classList.add('open');
-    document.getElementById('user-input').focus();
+    bubble.style.transform = 'rotate(15deg) scale(1.05)';
+    setTimeout(() => document.getElementById('user-input').focus(), 100);
   } else {
     win.classList.remove('visible');
-    bubble.classList.remove('open');
+    bubble.style.transform = '';
   }
 }
 
@@ -304,7 +316,6 @@ async function sendMsg() {
   document.getElementById('suggestions').style.display = 'none';
   addMsg(text, 'user');
   const typing = addMsg('Đang tìm kiếm...', 'bot typing');
-
   try {
     const res  = await fetch('/chat', {
       method: 'POST',
@@ -323,12 +334,10 @@ async function sendMsg() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-  const input = document.getElementById('user-input');
-  const btn   = document.getElementById('send-btn');
-  input.addEventListener('keydown', (e) => {
+  document.getElementById('user-input').addEventListener('keydown', (e) => {
     if (e.key === 'Enter') { e.preventDefault(); sendMsg(); }
   });
-  btn.addEventListener('click', sendMsg);
+  document.getElementById('send-btn').addEventListener('click', sendMsg);
 });
 </script>
 </body>
